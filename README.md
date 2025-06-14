@@ -6,16 +6,18 @@
 conda create -n doc2json python=3.8 pytest
 conda activate doc2json
 pip install -r requirements.txt
-apt install texlive-extra-utils tralics
+apt install texlive-extra-utils tralics latexml
 python setup.py develop
 ```
+
+tralics、latexml 会用到，务必安装
 
 ## 安装Grobid
 ```
 bash scripts/setup_grobid.sh
 bash scripts/run_grobid.sh
 ```
-ps:安装结束后，运行grobid的时候，进度条可能卡在91%，这个是正常状态
+ps:安装结束后，运行grobid的时候，进度条可能卡在91%，这个是正常状态，grobid 已经可用正常工作。当开启时，参考文献会在解析结果最后，不开启则会缺失
 
 ## 开始解析
 将LaTex压缩包放入/test/latex中，设置输出文件夹，首先启动Groid,运行代码。代码运行例子如下：
@@ -25,6 +27,8 @@ bash scripts/run_grobid.sh
 python doc2json/tex2json/process_tex.py -i test/latex/2004.14974.gz -t temp_dir/ -o output_dir/
 ```
 结果可以在output_dir查看，其中输入文件名的json文件是使用Grobid解析的结果，parquet文件为最终结果。
+
+split_size 默认为 200,请根据 parquet 文件大小设置合适尺寸
 
 ```
 ./output_dir/2004.14974.json  为使用 Grobid 解析的结果
