@@ -7,3 +7,9 @@ lxml
 python-magic==0.4.18
 latex2mathml==2.16.2
 itsdangerous==2.0.1
+loguru
+pillow
+htmlmin
+pylibmagic
+pdf2image
+pyarrow
