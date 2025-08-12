@@ -1350,7 +1350,7 @@ def process_abstract_from_tex(sp: BeautifulSoup, bib_map: Dict, ref_map: Dict) -
         else:
             p_tags = None
         if p_tags:
-            for p in p_tags:
+            for p in p_tags: # 当没有新的 section，只有 <p> 标签，会导致所有内容塞到 abstract 中
                 abstract_text.append(
                     process_paragraph(sp, p, [(None, "Abstract")], bib_map, ref_map)
                 )

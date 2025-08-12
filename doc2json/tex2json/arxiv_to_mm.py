@@ -31,15 +31,15 @@ class ArxivBlock:
 
     def to_dict(self) -> Dict:
         return {
-            "文件md5": str(self.file_md5),
-            "文件id": str(self.file_id),
-            "页码": None,
-            "块id": int(self.block_id),
+            "md5": str(self.file_md5),
+            "实体ID": str(self.file_id),
+            "页ID": None,
+            "块ID": int(self.block_id),
             "文本": str(self.text),
-            "图像": self.image_data,
+            "图片": self.image_data,
             "块类型": str(self.category),
-            "处理时间": str(self.timestamp),
-            "元数据": str(self.meta_data)
+            "时间": str(self.timestamp),
+            "扩展字段": str(self.meta_data)
         }
 
     def from_dict(self, dict_data: Dict):

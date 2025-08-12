@@ -79,3 +79,19 @@ def bytes_to_img(img_byte_arr, img_path):
         logger.error(f"二进制数据转换图片失败: {e}")
 
 ```
+2000 前的 arxiv 支持效果不佳
+
+
+## for arxiv spider download 执行
+0. 删除所有备份文件
+rm -rf /path/to/arxiv_spider_download/*/source_extentions
+
+1. 获取所有 source 下论文压缩文件
+python doc2json/tex2json/detect_file_type.py --dir /path/to/arxiv_spider_download/
+得到 resource_tmp/source_text_file_list.txt
+
+2. 解析所有文件，获取 json + 单篇论文 parquet
+python doc2json/tex2json/process_source.py -i resource_tmp/source_text_file_list.txt
+
+3. 合并 parquet
+python doc2json/tex2json/concat_parquet.py --input_dir output/ --output_dir output_all/

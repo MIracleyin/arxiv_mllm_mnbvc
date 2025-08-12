@@ -13,3 +13,4 @@ htmlmin
 pylibmagic
 pdf2image
 pyarrow
+PyMuPDF>=1.23.0

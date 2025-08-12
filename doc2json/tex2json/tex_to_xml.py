@@ -34,7 +34,8 @@ def extract_latex(zip_file: str, latex_dir: str, cleanup=True):
     :return:
     """
     assert os.path.exists(zip_file)
-    assert zip_file.endswith('.gz') or zip_file.endswith('.zip') or zip_file.endswith('.tar')
+    # assert zip_file.endswith('.gz') or zip_file.endswith('.zip') or zip_file.endswith('.tar') or zip_file.endswith('.tar.gz')
+    assert zip_file.endswith('.tar.gz') or zip_file.endswith('.tar') or zip_file.endswith('.gz') or zip_file.endswith('.zip') or zip_file.endswith('.tex')
 
     # get name of zip file
     file_id = os.path.splitext(zip_file)[0].split('/')[-1]
@@ -96,7 +97,7 @@ def extract_latex(zip_file: str, latex_dir: str, cleanup=True):
                     safe_extract(tar, tar_dir)
                 os.remove(tar_file)
             # else, copy to tex file
-            else:
+            else: # old tex file could be ps file
                 tex_file = os.path.join(latex_dir, file_id, f'{file_id}.tex')
                 os.makedirs(tar_dir, exist_ok=True)
                 os.rename(tar_file, tex_file)
@@ -104,6 +105,10 @@ def extract_latex(zip_file: str, latex_dir: str, cleanup=True):
     elif zipfile.is_zipfile(zip_file):
         with zipfile.ZipFile(zip_file, 'r') as in_f:
             in_f.extractall(tar_dir)
+    elif zip_file.endswith('.tex'):
+        tex_file = os.path.join(latex_dir, file_id, f'{file_id}.tex')
+        os.makedirs(tar_dir, exist_ok=True)
+        os.rename(zip_file, tex_file)
     else:
         return None
 

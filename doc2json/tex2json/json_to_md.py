@@ -144,9 +144,29 @@ def normal_reference(dict_data, text):
         elif ref_id.startswith('SECREF'):  # section 处理
             parent = ref_entry['parent']
             section_num = [ref_entry['num']]
-            while parent:
-                section_num.append(dict_data[parent]["num"])
-                parent = dict_data[parent]['parent']
+            visited = set()  # 用于检测循环引用
+            max_depth = 10   # 最大递归深度限制
+            
+            depth = 0
+            while parent and depth < max_depth:
+                if parent in visited:
+                    # 检测到循环引用，记录警告并跳出循环
+                    print(f"Warning: Circular reference detected in SECREF {ref_id} -> {parent}")
+                    break
+                visited.add(parent)
+                
+                if parent in dict_data:
+                    section_num.append(dict_data[parent]["num"])
+                    parent = dict_data[parent]['parent']
+                else:
+                    # parent 不存在于 dict_data 中，记录警告并跳出循环
+                    print(f"Warning: Parent {parent} not found in dict_data for SECREF {ref_id}")
+                    break
+                depth += 1
+            
+            # 如果达到最大深度，记录警告
+            if depth >= max_depth:
+                print(f"Warning: Maximum depth {max_depth} reached for SECREF {ref_id}")
             if None not in section_num:
                 section_name = ".".join(section_num[::-1])
                 text = text.replace(f' {ref_id} ', f' {section_name} ')
