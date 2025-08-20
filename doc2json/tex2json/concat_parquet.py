@@ -52,13 +52,45 @@ def concat_data(paramters):
         # 使用 Arrow 以行组为单位流式写入，避免一次性加载到内存
         writer = None
         try:
+            # 首先读取第一个文件来获取基础schema
+            first_file = file_paths[0]
+            first_pf = pq.ParquetFile(first_file)
+            base_schema = first_pf.schema_arrow
+            
+            # 创建统一的schema，移除pandas metadata以避免不匹配
+            unified_schema = base_schema.remove_metadata()
+            
+            # 创建writer使用统一的schema
+            writer = pq.ParquetWriter(save_path, unified_schema, compression="snappy")
+            
+            # 处理所有文件
             for each_path in file_paths:
                 try:
                     pf = pq.ParquetFile(each_path)
-                    if writer is None:
-                        writer = pq.ParquetWriter(save_path, pf.schema_arrow, compression="snappy")
                     for rg_idx in range(pf.num_row_groups):
                         table = pf.read_row_group(rg_idx)
+                        # 确保table的schema与writer的schema兼容
+                        if table.schema != unified_schema:
+                            # 如果schema不匹配，尝试转换
+                            try:
+                                # 使用pyarrow的cast功能来确保schema兼容
+                                table = table.cast(unified_schema)
+                            except Exception as cast_error:
+                                # 如果cast失败，记录错误但继续处理
+                                save_jsonl(
+                                    {
+                                        "reason": {
+                                            "e": f"Schema cast failed: {str(cast_error)}",
+                                            "exc_type": "SchemaCastError",
+                                            "exc_value": str(cast_error),
+                                            "exc_traceback": repr(cast_error),
+                                        },
+                                        "file": each_path,
+                                        "save_path": save_path,
+                                    },
+                                    global_log_file,
+                                )
+                                continue
                         writer.write_table(table)
                 except Exception as e:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
