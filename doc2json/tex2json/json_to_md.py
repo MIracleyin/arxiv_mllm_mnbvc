@@ -48,10 +48,25 @@ def get_body(dict_data, is_format=True):
 def normal_bibgraphy(dict_data, text):
     index = 1
     references = {}
-    for _, bib_entry in dict_data.items():
+    for _, bib_entry in (dict_data or {}).items():
         ref_string = format_bibgraphy(bib_entry)
-        ref_id = bib_entry['ref_id']
-        text = re.sub(ref_id, f'[{index}]', text, flags=re.DOTALL)
+        # Ensure ref_id exists and is a string for regex
+        ref_id = None
+        if isinstance(bib_entry, dict):
+            ref_id = bib_entry.get('ref_id')
+        if ref_id is None:
+            # Skip entries without a usable ref_id
+            references[index] = ref_string
+            index += 1
+            continue
+        if not isinstance(ref_id, str):
+            ref_id = str(ref_id)
+        pattern = re.escape(ref_id)
+        try:
+            text = re.sub(pattern, f'[{index}]', text, flags=re.DOTALL)
+        except re.error:
+            # If the pattern is invalid for any reason, skip replacing
+            pass
         references[index] = ref_string
         index += 1
     return text, references
@@ -171,7 +186,7 @@ def normal_reference(dict_data, text):
                 section_name = ".".join(section_num[::-1])
                 text = text.replace(f' {ref_id} ', f' {section_name} ')
             else:
-                text = text.replace(f' {ref_id} ', f' ')
+                text = text.replace(f' {ref_id} ', ' ')
     return text, footnote
 
 def addition_reference(text, bibgraphy, footnote):
@@ -193,15 +208,20 @@ def addition_reference(text, bibgraphy, footnote):
 def convert_json_to_markdown(json_data):
     title = json_data.get("title", "").strip()
     authors = json_data.get("authors", [])
-    abstract, title, authors = get_abstract(json_data['latex_parse']['abstract'], title, authors)
-    body_text = get_body(json_data['latex_parse']['body_text'], is_format=True)  # 是否保留标题的 ## 结构
+    latex_parse = json_data.get('latex_parse', {}) or {}
+    abstract_list = latex_parse.get('abstract', []) or []
+    body_list = latex_parse.get('body_text', []) or []
+    abstract, title, authors = get_abstract(abstract_list, title, authors)
+    body_text = get_body(body_list, is_format=True)  # 是否保留标题的 ## 结构
     text = f'** {title} **\n\n'
     text += f'{authors} \n\n'
     text += f'\n\n{abstract} \n\n'
     # text += f'Abstract \n\n {abstract} \n\n'
     text += body_text
-    text, bibgraphy = normal_bibgraphy(json_data['latex_parse']['bib_entries'], text)
-    text, footnote = normal_reference(json_data['latex_parse']['ref_entries'], text)
+    bib_entries = latex_parse.get('bib_entries', {}) or {}
+    ref_entries = latex_parse.get('ref_entries', {}) or {}
+    text, bibgraphy = normal_bibgraphy(bib_entries, text)
+    text, footnote = normal_reference(ref_entries, text)
     text = addition_reference(text, bibgraphy, footnote)
     return text
 
