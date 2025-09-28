@@ -153,13 +153,21 @@ def normalize(path, out_dir, write_logs=True):
                               temp_tex_fn]
 
         # run latexpand
+        latexpand_ok = True
         with open(os.path.join(out_dir, 'log_latexpand.txt'), 'a+') as err:
-            subprocess.run(latexpand_args, stderr=err, cwd=path)
+            try:
+                subprocess.run(latexpand_args, stderr=err, cwd=path, timeout=120)
+            except subprocess.TimeoutExpired:
+                # 超时则回退到直接读取主 tex，而不中断整个流程
+                latexpand_ok = False
+                err.write(f'latexpand timeout for {main_tex_path}\n')
 
-        # re-read and write to ensure utf-8 b/c latexpand doesn't
-        # behave
+        # re-read and write to ensure utf-8 b/c latexpand doesn't behave
         new_tex_fn = os.path.join(out_dir, f'{fn}.tex')
-        cntnt = read_file(temp_tex_fn)
+        if latexpand_ok and os.path.exists(temp_tex_fn):
+            cntnt = read_file(temp_tex_fn)
+        else:
+            cntnt = read_file(main_tex_fn)
         if PRE_FIX_NATBIB:
             cntnt = NATBIB_PATT.sub(r'\\cite{\3}', cntnt)
         if PRE_FIX_BIBOPT:
@@ -227,18 +235,20 @@ def latex_to_html(tex_file: str, out_file: str, err_file: str, log_file: str):
                         f'--dest={xml_file}'
                         ]
         try:
-            subprocess.run(latexml_args, stdout=devnull, stderr=err_f)
+            subprocess.run(latexml_args, stdout=devnull, stderr=err_f, timeout=120)
         except subprocess.TimeoutExpired:
             skip_f.write(f'{tex_file}\n')
 
-        latexmlpost_args = ['latexmlpost',
-                        xml_file,
-                        f'--dest={out_file}'
-                        ]
-        try:
-            subprocess.run(latexmlpost_args, stdout=devnull, stderr=err_f)
-        except subprocess.TimeoutExpired:
-            skip_f.write(f'{tex_file}\n')
+        # 仅当生成了 xml 再进行 post 处理
+        if os.path.exists(xml_file):
+            latexmlpost_args = ['latexmlpost',
+                            xml_file,
+                            f'--dest={out_file}'
+                            ]
+            try:
+                subprocess.run(latexmlpost_args, stdout=devnull, stderr=err_f, timeout=120)
+            except subprocess.TimeoutExpired:
+                skip_f.write(f'{tex_file}\n')
 
         # if no output, skip
         if not os.path.exists(out_file):

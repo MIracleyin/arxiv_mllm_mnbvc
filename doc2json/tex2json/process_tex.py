@@ -212,10 +212,13 @@ def split_pdf_images(main_latex_file, md_data):
                          '-synctex=1',
                          f'{os.path.basename(main_latex_file)}'
                          ]
-        subprocess.run(pdflatex_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # 设置编译超时，避免卡死
+        subprocess.run(pdflatex_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=180)
         os.chdir(cur_path)
     except subprocess.TimeoutExpired:
-        raise RuntimeError("pdflatex compile tex to pdf error")
+        os.chdir(cur_path)
+        # 回退：不抛异常，允许后续流程继续（例如跳过页面切分）
+        return []
     pdf_path = main_latex_file.replace('.tex', '.pdf')
     images = convert_from_path(pdf_path, dpi=300)
     pages_infos = []

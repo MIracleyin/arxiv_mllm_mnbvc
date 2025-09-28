@@ -6,6 +6,7 @@ import pathlib
 import tarfile
 import tempfile
 import time
+import multiprocessing as mp
 
 from doc2json.tex2json.process_tex import process_tex_file, clean_tmp
 from doc2json.tex2json.arxiv_to_mm import convert_to_rows, batch_to_parquet
@@ -13,6 +14,15 @@ from doc2json.tex2json.arxiv_to_mm import convert_to_rows, batch_to_parquet
 BASE_TEMP_DIR = 'temp'
 BASE_OUTPUT_DIR = 'output'
 BASE_LOG_DIR = 'log'
+
+
+def _process_one(source_path: str, temp_path: str, output_path: str, split_size: int, log_path: str, keep_temp: bool):
+    output_file, main_tex_file = process_tex_file(source_path, temp_path, output_path, log_path, keep_temp)
+    if output_file is None or main_tex_file is None:
+        raise RuntimeError(f"{source_path} is not a valid tex file")
+    parquet_out = output_file.replace('.json', '.parquet')
+    batchs = convert_to_rows(Path(output_file))
+    batch_to_parquet(Path(parquet_out), split_size, batchs)
 
 
 if __name__ == '__main__':
@@ -24,6 +34,7 @@ if __name__ == '__main__':
                         help="Split size")  # 500-1000MB 一个 parquet 文件
     parser.add_argument("-l", "--log", default='log', help="path to the log dir")
     parser.add_argument("-k", "--keep", default=True, help="keep temporary files")
+    parser.add_argument("--timeout", type=int, default=600, help="per-file max seconds before skipping")
 
     args = parser.parse_args()
 
@@ -52,19 +63,24 @@ if __name__ == '__main__':
         os.makedirs(temp_path, exist_ok=True)
         os.makedirs(output_path, exist_ok=True)  # noqa: F821
         start_time = time.time()
-        
-        output_file, main_tex_file = process_tex_file(source_path, temp_path, output_path, log_path, keep_temp)
-        if output_file is None or main_tex_file is None:
-            print(f"[ERROR] {source_path} is not a valid tex file")
+        try:
+            p = mp.Process(target=_process_one, args=(str(source_path), temp_path, output_path, split_size, log_path, keep_temp))
+            p.start()
+            p.join(args.timeout)
+            if p.is_alive():
+                print(f"[ERROR] processing {source_path} timeout after {args.timeout}s, skipping")
+                p.terminate()
+                p.join()
+                failed += 1
+                continue
+        except Exception as e:
+            # 捕获单个样本的异常，记录并继续
+            print(f"[ERROR] processing {source_path} failed: {e}")
             failed += 1
             continue
-        
-        parquet_out = output_file.replace('.json', '.parquet')
-    
-        batchs = convert_to_rows(Path(output_file))
-        batch_to_parquet(Path(parquet_out), split_size, batchs)
-        runtime = round(time.time() - start_time, 3)
-        clean_tmp()
+        finally:
+            runtime = round(time.time() - start_time, 3)
+            clean_tmp()
         print(f"[INFO] processed {processed} successfully")
         processed += 1
 
